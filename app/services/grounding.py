@@ -25,7 +25,7 @@ def _stem(word: str) -> str:
 
 
 def significant_tokens(text: str) -> set[str]:
-    words = (_stem(w) for w in re.findall(r"[a-z0-9]+", text.lower()))
+    words = (_stem(w) for w in re.findall(r"[^\W_]+", text.lower()))
     return {w for w in words if w not in _STOPWORDS}
 
 

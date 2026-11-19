@@ -219,6 +219,13 @@ def test_significant_tokens():
     assert significant_tokens("SEO Audits") == significant_tokens("seo audit")
 
 
+def test_significant_tokens_keep_non_ascii_words_whole():
+    # Regression: an ASCII-only pattern split "Küche" into "k" + "che", so German,
+    # French, Urdu... service names were matched on fragments.
+    assert significant_tokens("Küche & Haushalt") == {"küche", "haushalt"}
+    assert significant_tokens("Café Crème") == {"café", "crème"}
+
+
 def test_ground_services_relabels_unsupported():
     services = [_svc("SEO Audits", "website_content"), _svc("Blockchain Consulting", "website_content"),
                 _svc("Logo Design", "inferred")]
