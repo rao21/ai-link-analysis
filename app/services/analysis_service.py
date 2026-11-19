@@ -13,6 +13,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import httpx
@@ -40,6 +41,56 @@ from app.utils.validators import normalize_url
 logger = logging.getLogger("link_analysis")
 
 MAX_LLM_ATTEMPTS = 2  # first call + one corrective retry
+
+
+@dataclass
+class SiteContext:
+    url: str                       # final URL after redirects
+    home: ExtractedContent
+    subpages: list[ExtractedContent]
+    context: str                   # exactly what the LLM receives
+    raw_html_chars: int
+
+
+async def prepare_site(url: str, http: httpx.AsyncClient, settings: Settings) -> SiteContext:
+    """Fetch + extract + build the LLM context. Shared by the API and the benchmark,
+    so benchmark numbers describe exactly what production sends."""
+    home_page = await fetch_page(url, http, settings)
+    home = extract_content(home_page.html, home_page.url)
+    subpages, sub_html_chars = await _fetch_subpages(home, http, settings)
+    if content_chars(home, subpages) < settings.min_content_chars:
+        raise InsufficientContentError(
+            "The website returned too little readable text (it may render content with JavaScript), "
+            "so a reliable analysis isn't possible."
+        )
+    return SiteContext(
+        url=home_page.url,
+        home=home,
+        subpages=subpages,
+        context=build_llm_context(home, subpages, settings.max_context_chars),
+        raw_html_chars=len(home_page.html) + sub_html_chars,
+    )
+
+
+async def _fetch_subpages(home: ExtractedContent, http: httpx.AsyncClient,
+                          settings: Settings) -> tuple[list[ExtractedContent], int]:
+    urls = select_subpages(home.nav_links, home.url, settings.max_subpages)
+
+    async def one(u: str):
+        page = await fetch_page(u, http, settings)
+        return extract_content(page.html, page.url), len(page.html)
+
+    results = await asyncio.gather(*(one(u) for u in urls), return_exceptions=True)
+    pages, html_chars = [], 0
+    for u, result in zip(urls, results):
+        if isinstance(result, (AppError, httpx.HTTPError)):
+            logger.info("sub-page skipped %s: %s", u, result)
+            continue
+        if isinstance(result, BaseException):
+            raise result
+        pages.append(result[0])
+        html_chars += result[1]
+    return pages, html_chars
 
 
 class BudgetGuard:
@@ -148,23 +199,15 @@ class AnalysisService:
         return copy
 
     async def _analyze_uncached(self, url: str, started: float) -> LinkAnalysisResponse:
-        home_page = await fetch_page(url, self._http, self._settings)
-        home = extract_content(home_page.html, home_page.url)
-        subpages, sub_html_chars = await self._fetch_subpages(home)
+        site = await prepare_site(url, self._http, self._settings)
+        home, subpages, context = site.home, site.subpages, site.context
 
-        if content_chars(home, subpages) < self._settings.min_content_chars:
-            raise InsufficientContentError(
-                "The website returned too little readable text (it may render content with JavaScript), "
-                "so a reliable analysis isn't possible."
-            )
-        context = build_llm_context(home, subpages, self._settings.max_context_chars)
-
-        analysis, usage = await self._call_llm(build_user_prompt(home_page.url, context))
+        analysis, usage = await self._call_llm(build_user_prompt(site.url, context))
 
         services, relabeled = ground_services(analysis.top_services, context)
         cost = estimate_cost(self._llm.model, usage["input"], usage["cached"], usage["output"])
         response = LinkAnalysisResponse(
-            website=home_page.url,
+            website=site.url,
             brand=analysis.brand,
             analysis=Analysis(
                 competitor_analysis=finalize_competitors(analysis.competitor_analysis, analysis.brand.name),
@@ -180,7 +223,7 @@ class AnalysisService:
                 cached_input_tokens=usage["cached"],
                 output_tokens=usage["output"],
                 estimated_cost_usd=cost,
-                raw_html_chars=len(home_page.html) + sub_html_chars,
+                raw_html_chars=site.raw_html_chars,
                 context_chars=len(context),
                 services_relabeled=relabeled,
                 llm_latency_ms=usage["latency"],
@@ -193,31 +236,12 @@ class AnalysisService:
         )
         self._cache[url] = response
         logger.info(json.dumps({
-            "event": "analysis", "url": home_page.url, "model": self._llm.model,
+            "event": "analysis", "url": site.url, "model": self._llm.model,
             "input_tokens": usage["input"], "cached_input_tokens": usage["cached"],
             "output_tokens": usage["output"], "cost_usd": cost, "attempts": usage["attempts"],
             "latency_ms": response.meta.total_latency_ms, "services_relabeled": relabeled,
         }))
         return response
-
-    async def _fetch_subpages(self, home: ExtractedContent) -> tuple[list[ExtractedContent], int]:
-        urls = select_subpages(home.nav_links, home.url, self._settings.max_subpages)
-
-        async def one(u: str):
-            page = await fetch_page(u, self._http, self._settings)
-            return extract_content(page.html, page.url), len(page.html)
-
-        results = await asyncio.gather(*(one(u) for u in urls), return_exceptions=True)
-        pages, html_chars = [], 0
-        for u, result in zip(urls, results):
-            if isinstance(result, (AppError, httpx.HTTPError)):
-                logger.info("sub-page skipped %s: %s", u, result)
-                continue
-            if isinstance(result, BaseException):
-                raise result
-            pages.append(result[0])
-            html_chars += result[1]
-        return pages, html_chars
 
     async def _call_llm(self, user_prompt: str) -> tuple[LLMAnalysis, dict]:
         usage = {"input": 0, "cached": 0, "output": 0, "latency": 0, "attempts": 0}

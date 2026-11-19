@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .superpowers/
+
+# benchmark raw outputs and blind-scoring key stay local until the final run
+results/outputs/
+eval/blind/

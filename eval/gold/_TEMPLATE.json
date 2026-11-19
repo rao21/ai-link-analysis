@@ -1,0 +1,7 @@
+{
+  "url": "https://www.example-business.com/",
+  "brand_name": "Exact brand name as shown on the site",
+  "category": "e.g. Digital Marketing Agency",
+  "services": ["Service names exactly as the site lists them", "..."],
+  "location": "City, Country as stated on the site - or null if the site states none"
+}

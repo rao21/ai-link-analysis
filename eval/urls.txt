@@ -1,0 +1,4 @@
+# One public business website per line (6 recommended, different business types).
+# For each URL, write eval/gold/<domain-without-www>.json BEFORE running the benchmark.
+# Suggested mix: digital agency, SaaS product, local service business, e-commerce store,
+# B2B manufacturer, one non-English or regional site.
