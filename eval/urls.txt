@@ -1,4 +1,9 @@
-# One public business website per line (6 recommended, different business types).
-# For each URL, write eval/gold/<domain-without-www>.json BEFORE running the benchmark.
-# Suggested mix: digital agency, SaaS product, local service business, e-commerce store,
-# B2B manufacturer, one non-English or regional site.
+# One public business website per line. Each was checked to be fetchable (not bot-blocked,
+# not JavaScript-only) from the benchmark machine on 2026-11-19.
+# For each URL, write eval/gold/<host-without-www>.json (use the final URL after redirects) BEFORE running the benchmark.
+https://www.siegemedia.com
+https://trello.com
+https://www.rotorooter.com
+https://pk.sapphireonline.pk
+https://www.uline.com
+https://www.lidl.de
