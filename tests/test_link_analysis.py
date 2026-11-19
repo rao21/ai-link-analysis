@@ -175,7 +175,7 @@ def test_root_serves_demo_page(client):
 def test_demo_page_links_docs_and_source(client):
     html = client.get("/").text
     assert 'href="/docs"' in html
-    assert 'href="https://github.com/raopsych/ai-link-analysis"' in html
+    assert 'href="https://github.com/rao21/ai-link-analysis"' in html
 
 
 def test_openapi_documents_error_responses(client):
