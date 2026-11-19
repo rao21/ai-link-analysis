@@ -164,9 +164,12 @@ def test_no_api_key_gives_clear_error(monkeypatch, fake_resolver, respx_mock):
     assert response.json()["error"]["code"] == "LLM_UNAVAILABLE"
 
 
-def test_root_redirects_to_docs(client):
-    response = client.get("/", follow_redirects=False)
-    assert response.status_code in (302, 307) and response.headers["location"] == "/docs"
+def test_root_serves_demo_page(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert 'id="analyze-form"' in response.text
+    assert "/link-analysis" in response.text and "/docs" in response.text
 
 
 def test_openapi_documents_error_responses(client):

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Link Analysis</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #e3e2dc;
+    --accent: #2f5d50; --accent-text: #ffffff; --soft: #eef3f1; --warn: #8a5a00; --warn-bg: #fdf4e3;
+    --err: #9b2c2c; --err-bg: #fbeaea; --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --surface: #1f1f1d; --text: #ecebe6; --muted: #a3a29b; --border: #33322e;
+      --accent: #7fb8a6; --accent-text: #10201b; --soft: #22302b; --warn: #f0c36b; --warn-bg: #2e2716;
+      --err: #f2a3a3; --err-bg: #331c1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); }
+  header nav { margin-top: 8px; font-size: 14px; }
+  a { color: var(--accent); }
+  form { display: flex; gap: 8px; margin: 24px 0 8px; flex-wrap: wrap; }
+  input[type=text] { flex: 1 1 320px; padding: 12px 14px; font-size: 16px; border-radius: var(--radius);
+                     border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+  button { padding: 12px 20px; font-size: 16px; border: 0; border-radius: var(--radius);
+           background: var(--accent); color: var(--accent-text); cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .6; cursor: progress; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .status { margin: 16px 0; padding: 12px 14px; border-radius: var(--radius); }
+  .status.err { background: var(--err-bg); color: var(--err); }
+  .status.info { background: var(--soft); }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 16px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  section.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+                 padding: 18px 20px; margin: 14px 0; }
+  section.card h2 { font-size: 17px; margin: 0 0 10px; }
+  .brand h2 { font-size: 22px; margin-bottom: 2px; }
+  .muted { color: var(--muted); }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; margin: 1px 2px 1px 0;
+           background: var(--soft); color: var(--text); border: 1px solid var(--border); white-space: nowrap; }
+  .badge.inferred, .badge.ai { background: var(--warn-bg); color: var(--warn); }
+  .note { background: var(--warn-bg); color: var(--warn); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  .issues li { color: var(--warn); }
+  footer { margin-top: 32px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>AI Link Analysis</h1>
+    <p>Enter a business website. The API reads it and returns competitors, search queries, SEO, services and audience.</p>
+    <nav><a href="/docs">API docs (/docs)</a> · <code>POST /link-analysis</code></nav>
+  </header>
+
+  <form id="analyze-form">
+    <input id="url" type="text" inputmode="url" placeholder="https://www.example-business.com" aria-label="Website URL" required>
+    <button id="go" type="submit">Analyze</button>
+  </form>
+  <div class="hint">Takes about 5–20 seconds. Results for the same URL are cached for 6 hours.</div>
+
+  <div id="status"></div>
+  <div id="result"></div>
+
+  <footer>Every response includes token usage, estimated cost and latency. Competitors are AI suggestions; search volumes are never invented.</footer>
+</main>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const list = (items) => items && items.length ? "<ul>" + items.map((i) => `<li>${esc(i)}</li>`).join("") + "</ul>" : '<span class="muted">—</span>';
+const badges = (items, cls = "") => (items || []).map((i) => `<span class="badge ${cls}">${esc(i)}</span>`).join("");
+const safeUrl = (u) => /^https?:\/\//i.test(u || "") ? u : null;
+
+const FRIENDLY = {
+  INVALID_URL: "That doesn't look like a valid website address.",
+  BLOCKED_ADDRESS: "That address points to a private network and was blocked for security.",
+  SITE_UNREACHABLE: "The website couldn't be reached.",
+  SITE_TIMEOUT: "The website took too long to respond.",
+  UNSUPPORTED_CONTENT: "That URL is not a web page.",
+  INSUFFICIENT_CONTENT: "The site has too little readable text (it may need JavaScript to render).",
+  LLM_UNAVAILABLE: "The AI service is unavailable right now.",
+  LLM_INVALID_OUTPUT: "The AI couldn't produce a valid analysis. Please try again.",
+  LLM_REFUSED: "The AI declined to analyze this site.",
+  RATE_LIMITED: "Too many requests. Please wait a minute.",
+  BUDGET_EXCEEDED: "The demo's daily AI budget is used up. Try again tomorrow.",
+};
+
+function render(d) {
+  const a = d.analysis, ca = a.competitor_analysis, seo = a.seo_improvements, aud = a.target_audience, m = d.meta;
+  const cost = m.estimated_cost_usd == null ? "n/a" : "$" + m.estimated_cost_usd.toFixed(5);
+  return `
+  <div class="meta">
+    <div class="stat"><b>${(m.total_latency_ms / 1000).toFixed(1)}s</b><span>total time${m.cached ? " (cached)" : ""}</span></div>
+    <div class="stat"><b>${cost}</b><span>estimated LLM cost</span></div>
+    <div class="stat"><b>${m.input_tokens.toLocaleString()} / ${m.output_tokens.toLocaleString()}</b><span>input / output tokens</span></div>
+    <div class="stat"><b>${m.cached_input_tokens.toLocaleString()}</b><span>cached input tokens</span></div>
+    <div class="stat"><b>${m.raw_html_chars.toLocaleString()} → ${m.context_chars.toLocaleString()}</b><span>HTML chars → sent to AI</span></div>
+    <div class="stat"><b>${esc(m.model)}</b><span>${m.pages_analyzed.length} page(s), ${m.llm_attempts} attempt(s)</span></div>
+  </div>
+
+  <section class="card brand">
+    <h2>${esc(d.brand.name)}</h2>
+    <div class="muted">${esc(d.brand.category)} · <a href="${esc(safeUrl(d.website) || "#")}" target="_blank" rel="noopener noreferrer">${esc(d.website)}</a></div>
+    <p>${esc(d.brand.summary)}</p>
+  </section>
+
+  <section class="card">
+    <h2>1 · Competitors vs your brand</h2>
+    <div class="note">${esc(ca.disclaimer)}</div>
+    <p>${esc(ca.brand_overview)}</p>
+    <div class="table-wrap"><table>
+      <tr><th>Competitor</th><th>Market</th><th>Strengths</th><th>Weaknesses</th></tr>
+      ${ca.competitors.map((c) => `<tr><td><b>${esc(c.name)}</b> <span class="badge ai">AI suggestion</span><br>
+        ${safeUrl(c.website) ? `<a href="${esc(c.website)}" target="_blank" rel="noopener noreferrer">${esc(c.website)}</a>` : '<span class="muted">no website</span>'}<br>
+        <span class="muted">${esc(c.description)}</span></td><td>${esc(c.target_market)}</td><td>${list(c.strengths)}</td><td>${list(c.weaknesses)}</td></tr>`).join("")}
+    </table></div>
+    <div class="table-wrap"><table style="margin-top:12px">
+      <tr><th>Comparison</th><th>${esc(d.brand.name)}</th><th>Competitor</th></tr>
+      ${ca.comparison_table.map((r) => `<tr><td>${esc(r.aspect)}</td><td>${esc(r.your_brand)}</td><td><b>${esc(r.competitor_name)}</b>: ${esc(r.competitor_value)}</td></tr>`).join("")}
+    </table></div>
+    <div class="two"><div><h3>Your advantages</h3>${list(ca.competitive_advantages)}</div><div><h3>Opportunities</h3>${list(ca.market_opportunities)}</div></div>
+  </section>
+
+  <section class="card">
+    <h2>2 · Top 5 target search queries</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Query</th><th>Platforms</th><th>Intent</th><th>Audience</th></tr>
+      ${a.target_search_queries.map((q) => `<tr><td><b>${esc(q.query)}</b><br><span class="muted">${esc(q.business_relevance)}</span></td><td>${badges(q.platforms)}</td><td>${esc(q.intent)}</td><td>${esc(q.target_audience)}</td></tr>`).join("")}
+    </table></div>
+    <p class="muted">No search volumes are shown: they are not available without a search-data API, and are never invented.</p>
+  </section>
+
+  <section class="card">
+    <h2>3 · SEO improvements</h2>
+    <div class="two">
+      <div><h3>Current page (measured)</h3>
+        <p><b>Title (${seo.current_audit.title_length} chars):</b> ${esc(seo.current_audit.title) || '<span class="muted">missing</span>'}</p>
+        <p><b>Meta description (${seo.current_audit.meta_description_length} chars):</b> ${esc(seo.current_audit.meta_description) || '<span class="muted">missing</span>'}</p>
+        <ul class="issues">${seo.current_audit.issues.map((i) => `<li>${esc(i)}</li>`).join("") || "<li>No issues found</li>"}</ul>
+      </div>
+      <div><h3>Recommended</h3>
+        <p><b>Title (${seo.recommended_title.length} chars):</b> ${esc(seo.recommended_title)}</p>
+        <p class="muted">${esc(seo.title_rationale)}</p>
+        <p><b>Meta description (${seo.meta_description.length} chars):</b> ${esc(seo.meta_description)}</p>
+      </div>
+    </div>
+    <p><b>Primary keyword:</b> ${badges([seo.primary_keyword])}</p>
+    <p><b>Secondary:</b> ${badges(seo.secondary_keywords)}</p>
+    <p><b>Long-tail:</b> ${badges(seo.long_tail_keywords)}</p>
+    <p><b>Business keywords:</b> ${badges(seo.business_keywords)}</p>
+    <h3>Supporting content</h3>
+    <ul>${seo.supporting_content.map((c) => `<li><span class="badge">${esc(c.type.replace("_", " "))}</span> <b>${esc(c.title)}</b> — ${esc(c.purpose)}</li>`).join("")}</ul>
+  </section>
+
+  <section class="card">
+    <h2>4 · Top 5 services</h2>
+    <div class="table-wrap"><table>
+      <tr><th>Service</th><th>Industry</th><th>Customer</th><th>Main benefit</th></tr>
+      ${a.top_services.map((s) => `<tr><td><b>${esc(s.name)}</b> <span class="badge ${s.source === "inferred" ? "inferred" : ""}">${s.source === "inferred" ? "inferred" : "from website"}</span><br><span class="muted">${esc(s.description)}</span></td><td>${esc(s.target_industry)}</td><td>${esc(s.target_customer)}</td><td>${esc(s.main_benefit)}</td></tr>`).join("")}
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>5 · Target audience</h2>
+    <div class="two">
+      <div><h3>Primary</h3>${list(aud.primary_audience)}<h3>Secondary</h3>${list(aud.secondary_audience)}<h3>Location</h3><p>${esc(aud.geographic_focus) || '<span class="muted">not stated on the site</span>'}</p></div>
+      <div><h3>Needs</h3>${list(aud.customer_needs)}<h3>Challenges</h3>${list(aud.customer_challenges)}<h3>Interests</h3>${list(aud.interests)}</div>
+    </div>
+    <p><b>Industries:</b> ${badges(aud.industries)}</p>
+    <p><b>Business types:</b> ${badges(aud.business_types)}</p>
+    <div class="table-wrap"><table>
+      <tr><th>Recommended segment</th><th>Business type</th><th>Requirement</th></tr>
+      ${aud.recommended_segments.map((s) => `<tr><td>${esc(s.segment)}</td><td>${esc(s.business_type)}</td><td>${esc(s.requirement)}</td></tr>`).join("")}
+    </table></div>
+  </section>`;
+}
+
+$("#analyze-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const url = $("#url").value.trim();
+  if (!url) return;
+  $("#go").disabled = true;
+  $("#result").innerHTML = "";
+  $("#status").innerHTML = '<div class="status info">Reading the website and asking the AI…</div>';
+  try {
+    const res = await fetch("/link-analysis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (!data.success) {
+      const e = data.error || {};
+      $("#status").innerHTML = `<div class="status err"><b>${esc(FRIENDLY[e.code] || "Something went wrong.")}</b><br><span>${esc(e.code)}: ${esc(e.message)}</span></div>`;
+      return;
+    }
+    $("#status").innerHTML = "";
+    $("#result").innerHTML = render(data);
+  } catch (err) {
+    $("#status").innerHTML = '<div class="status err">Network error — is the server running?</div>';
+  } finally {
+    $("#go").disabled = false;
+  }
+});
+</script>
+</body>
+</html>

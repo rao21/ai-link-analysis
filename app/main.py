@@ -1,9 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -124,9 +125,13 @@ async def link_analysis(
     return await service.analyze(body.url)
 
 
+_DEMO_PAGE = Path(__file__).parent / "static" / "index.html"
+
+
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    return RedirectResponse("/docs")
+async def demo_page() -> FileResponse:
+    """A small UI for non-technical reviewers; the API itself is POST /link-analysis."""
+    return FileResponse(_DEMO_PAGE, media_type="text/html")
 
 
 @app.get("/health", tags=["system"])

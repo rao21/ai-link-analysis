@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-link-analysis
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Values are set in the Render dashboard, never in this file.
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DAILY_BUDGET_USD
+        value: "1.0"
+      - key: RATE_LIMIT
+        value: "10/minute"
