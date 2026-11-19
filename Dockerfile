@@ -15,6 +15,6 @@ RUN useradd --create-home appuser
 USER appuser
 
 EXPOSE 4000
-# --proxy-headers: behind a hosting proxy, take the client IP from X-Forwarded-For
-# so rate limiting is per user, not per proxy.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-4000} --proxy-headers --forwarded-allow-ips='*'"]
+# Client IP for rate limiting is derived in app.main.client_ip (TRUST_PROXY_HEADERS),
+# not via --forwarded-allow-ips='*', which would let clients spoof X-Forwarded-For.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-4000}"]

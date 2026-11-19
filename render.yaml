@@ -18,5 +18,7 @@ services:
         sync: false
       - key: DAILY_BUDGET_USD
         value: "1.0"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
       - key: RATE_LIMIT
         value: "10/minute"

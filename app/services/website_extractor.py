@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, CData, NavigableString, Tag
 
 from app.config import Settings
 from app.errors import (
@@ -140,6 +140,7 @@ MAX_SUBPAGE_DEPTH = 2
 FILE_EXTENSIONS = (".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".zip", ".mp4", ".doc", ".docx")
 _HIDDEN_STYLE = re.compile(r"display:none|visibility:hidden|font-size:0(?:px|em|rem|pt|%)?(?:;|$|!)")
 _BREAK = " "  # paragraph separator used as a line marker while extracting text
+_BLOCK_SET = frozenset(BLOCK_TAGS)
 
 
 @dataclass
@@ -220,14 +221,34 @@ def _is_hidden(tag) -> bool:
 
 
 def _visible_text(root) -> str:
-    """Text with one line per block element, so inline tags (<a>, <strong>) don't split sentences."""
-    for tag in root.find_all(BLOCK_TAGS):
-        tag.insert_before(_BREAK)
-        tag.insert_after(_BREAK)
-    text = root.get_text("")
-    lines = (_clean(line) for line in text.split(_BREAK))
+    """Text with one line per block element, so inline tags (<a>, <strong>) don't split sentences.
+
+    Walks the tree once without modifying it (inserting markers into a wide, flat
+    tree is quadratic in bs4 and froze the event loop on large pages).
+    """
+    parts: list[str] = []
+    stack = [iter(root.children)]
+    while stack:
+        child = next(stack[-1], None)
+        if child is None:
+            stack.pop()
+            continue
+        if isinstance(child, Tag):
+            if child.name in _BLOCK_SET:
+                parts.append(_BREAK)
+                stack.append(_then_break(child.children))
+            else:
+                stack.append(iter(child.children))
+        elif type(child) in (NavigableString, CData):
+            parts.append(str(child))
+    lines = (_clean(line) for line in "".join(parts).split(_BREAK))
     # One-word lines are UI noise ("Menu", "Login", "×"); 2+ words can be real services ("Local SEO").
     return "\n".join(_dedupe(line for line in lines if len(line.split()) >= 2))
+
+
+def _then_break(children):
+    yield from children
+    yield NavigableString(_BREAK)
 
 
 def _seo_audit(soup: BeautifulSoup) -> SEOAudit:
@@ -296,7 +317,7 @@ def _json_ld(soup: BeautifulSoup) -> list[dict]:
                 continue
             types = item.get("@type")
             types = types if isinstance(types, list) else [types]
-            if any(t in JSON_LD_TYPES for t in types):
+            if any(isinstance(t, str) and t in JSON_LD_TYPES for t in types):
                 found.append(item)
     return found
 

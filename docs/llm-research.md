@@ -7,9 +7,9 @@ How the model for this API was chosen, what each option costs, and how cost was 
 **measured** by `scripts/benchmark_llms.py` and `scripts/evaluate.py` on real websites;
 anything not measured is labelled *estimate* or *calculated*.
 
-> **Status:** sections A, C (levers) and the method are complete. The measured columns and
-> section D are filled by running the benchmark (see [How to reproduce](#how-to-reproduce));
-> until then they are marked *pending measurement*.
+> **Status:** sections A–D are complete from official documentation and calculated estimates
+> (each labelled). Columns marked *pending measurement* are filled by running the benchmark
+> (see [How to reproduce](#how-to-reproduce)).
 
 ---
 
@@ -96,17 +96,28 @@ extraction is done by code at zero LLM cost.
 
 ## D. Final recommendation
 
-*Pending measurement.* Filled from `results/benchmark.md`, `results/eval.json` and
-`results/human_scores.json`:
+### Provisional recommendation (from official specs + calculated estimates)
 
-- Recommended provider / model:
-- Measured avg input tokens / output tokens:
-- Measured cost per analysis / per 1,000:
-- Measured p50 latency:
-- Accuracy (automatic metrics + blind human score):
-- Why this model:
-- Fallback model:
-- Balancing accuracy, speed and cost:
+| | Value | Basis |
+|---|---|---|
+| Recommended provider / model | **Anthropic `claude-haiku-5-5`** | lowest list price (tied with GPT-6 Luna), cheapest cache reads, native JSON-schema output, explicit prompt-cache control |
+| Fallback model | **OpenAI `gpt-6-luna`** | same price tier, different provider, so an outage at one vendor doesn't take the API down; switch with `LLM_PROVIDER`/`LLM_MODEL` |
+| Estimated input tokens | ~6,100–6,800 per analysis | *estimate*: system prompt ~585 + output schema ~1,250 + site context ~4,200–4,900 (context sizes from the dry run on basecamp.com / mailchimp.com; chars ÷ 4) |
+| Estimated output tokens | ~1,500–3,000 | *estimate*: a complete sample answer is ~1,400 tokens; upper bound allows for low-effort reasoning tokens |
+| Estimated cost per analysis | **~$0.0014–0.0022** (≈ $1.4–2.2 per 1,000) | *calculated*: estimated tokens × official prices. Same for GPT-6 Luna; Gemini 3.1 Flash-Lite ≈ $0.0038–0.0062 |
+| Expected response time | *not claimed until measured* | latency depends on provider load; the benchmark reports p50 |
+| Balancing approach | small-tier model at low reasoning effort, one call, bounded output, cached prompt prefix, validated output with a single corrective retry | see section C |
+
+**Why provisional:** list price is only half of cost. A model that fails the schema or the
+business rules on its first try pays for a second full call, and accuracy decides whether the
+output is usable at all. The measured run below can overturn this choice.
+
+### Measured result
+
+*Pending measurement* — filled from `results/benchmark.md`, `results/eval.json` and
+`results/human_scores.json` after running the benchmark below: measured tokens, cost per
+analysis and per 1,000, p50 latency, first-try JSON validity, accuracy metrics and blind
+human scores per model, and the final pick.
 
 ## How to reproduce
 

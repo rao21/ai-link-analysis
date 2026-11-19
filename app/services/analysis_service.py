@@ -56,7 +56,8 @@ async def prepare_site(url: str, http: httpx.AsyncClient, settings: Settings) ->
     """Fetch + extract + build the LLM context. Shared by the API and the benchmark,
     so benchmark numbers describe exactly what production sends."""
     home_page = await fetch_page(url, http, settings)
-    home = extract_content(home_page.html, home_page.url)
+    # Parsing is CPU work: run it in a thread so other requests aren't blocked meanwhile.
+    home = await asyncio.to_thread(extract_content, home_page.html, home_page.url)
     subpages, sub_html_chars = await _fetch_subpages(home, http, settings)
     if content_chars(home, subpages) < settings.min_content_chars:
         raise InsufficientContentError(
@@ -78,7 +79,7 @@ async def _fetch_subpages(home: ExtractedContent, http: httpx.AsyncClient,
 
     async def one(u: str):
         page = await fetch_page(u, http, settings)
-        return extract_content(page.html, page.url), len(page.html)
+        return await asyncio.to_thread(extract_content, page.html, page.url), len(page.html)
 
     results = await asyncio.gather(*(one(u) for u in urls), return_exceptions=True)
     pages, html_chars = [], 0

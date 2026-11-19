@@ -197,3 +197,22 @@ def test_og_description_not_repeated_when_same_as_meta():
     <meta property="og:description" content="Same text here."></head><body><p>Body text here.</p></body></html>"""
     ctx = build_llm_context(extract_content(html, "https://d.test/"), [], 5000)
     assert ctx.count("Same text here.") == 1
+
+
+def test_flat_large_page_extracts_quickly():
+    import time
+
+    html = "<html><body>" + "".join(f"<div>Line number {i} of the page</div>" for i in range(20_000)) + "</body></html>"
+    started = time.perf_counter()
+    page = extract_content(html, "https://flat.test/")
+    assert time.perf_counter() - started < 3.0
+    assert "Line number 19999 of the page" in page.body_text
+
+
+def test_unusual_json_ld_types_do_not_crash():
+    html = """<html><head>
+    <script type="application/ld+json">{"@type": {"weird": 1}, "name": "X"}</script>
+    <script type="application/ld+json">{"@type": [["Organization"]], "name": "Y"}</script>
+    <script type="application/ld+json">{"@type": ["Thing", "Organization"], "name": "Z"}</script>
+    </head><body><p>Some body text here.</p></body></html>"""
+    assert [i["name"] for i in extract_content(html, "https://j.test/").json_ld] == ["Z"]

@@ -7,7 +7,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import get_settings
@@ -59,7 +58,18 @@ def register_exception_handlers(target: FastAPI) -> None:
         return _error(500, "INTERNAL_ERROR", "An unexpected error occurred. Please try again later.")
 
 
-limiter = Limiter(key_func=get_remote_address)
+def client_ip(request: Request) -> str:
+    """Rate-limit key. X-Forwarded-For's LEFTMOST entry is whatever the client typed;
+    the RIGHTMOST is the address the trusted proxy actually saw."""
+    if get_settings().trust_proxy_headers:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
+    return request.client.host if request.client else "unknown"
+
+
+limiter = Limiter(key_func=client_ip)
 
 
 @asynccontextmanager

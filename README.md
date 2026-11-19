@@ -8,8 +8,8 @@ A FastAPI service that reads a business website and uses an LLM to return a stru
 | **Live demo** | _added after deployment_ |
 | **API docs** | `/docs` on the live URL (Swagger) |
 | **Endpoint** | `POST /link-analysis` with `{"url": "https://example.com"}` |
-| **Tests** | 154 automated tests (`pytest`) — no API key or network needed |
-| **Model choice** | See [LLM research](docs/llm-research.md): official prices, measured cost/latency/accuracy |
+| **Tests** | 159 automated tests (`pytest`) — no API key or network needed |
+| **Model choice** | See [LLM research](docs/llm-research.md): official prices, calculated cost per analysis, and the benchmark that measures cost, latency and accuracy |
 
 **What makes it production-minded**
 
@@ -24,7 +24,7 @@ A FastAPI service that reads a business website and uses an LLM to return a stru
   loopback, link-local, cloud-metadata, IPv6 and obfuscated forms like `2130706433`), size and
   time limits, hidden-text stripping against prompt injection.
 - **Cost-aware** — one LLM call for all five sections, cleaned and capped context
-  (e.g. ~95% fewer tokens than raw HTML), bounded output, prompt caching, response cache,
+  (on mailchimp.com's homepage: ~108k tokens of raw HTML → ~4.9k tokens sent, estimated), bounded output, prompt caching, response cache,
   in-flight de-duplication, and a daily budget cap. Every response reports its own tokens,
   cost and latency.
 - **Provider-agnostic** — the same code runs Gemini, Claude or OpenAI (one env var), which is
@@ -64,6 +64,7 @@ docker run --rm -p 4000:4000 --env-file .env ai-link-analysis
 | `MAX_CONTEXT_CHARS` | `24000` | cap on website text sent to the LLM |
 | `CACHE_TTL_S` | `21600` | response cache lifetime (6 h) |
 | `RATE_LIMIT` | `10/minute` | per client IP |
+| `TRUST_PROXY_HEADERS` | `false` | `true` only behind a proxy that appends the client IP to `X-Forwarded-For` |
 | `DAILY_BUDGET_USD` | `2.0` | hard daily cap on estimated LLM spend |
 
 ---
@@ -205,11 +206,12 @@ Full write-up: **[docs/llm-research.md](docs/llm-research.md)**.
 | Cached input $ per 1M | $0.01 | $0.025 | $0.01 |
 | Structured JSON output | Yes | Yes | Yes |
 
-_Prices from official pricing pages, retrieved 2026-11-19. Measured latency, cost per analysis,
-accuracy and the final recommendation are in the research doc._
+_Prices from official pricing pages, retrieved 2026-11-19. Estimated cost per analysis:
+~$0.0014–0.0022 for Claude Haiku 5.5 / GPT-6 Luna, ~$0.004–0.006 for Gemini 3.1 Flash-Lite
+(calculated from estimated tokens; see the research doc, which also holds the measured results)._
 
-How accuracy is measured: a hand-written gold set (brand, services, location per site) written
-before any model ran, automatic metrics (services recall/precision, brand, location, JSON
+How accuracy is measured: a hand-written gold set (brand, services, location per site) that is
+written before any model runs, automatic metrics (services recall/precision, brand, location, JSON
 validity, stability), a prompt-injection test page, and blind human scoring with model names
 hidden — see [eval/README.md](eval/README.md).
 
@@ -219,9 +221,12 @@ hidden — see [eval/README.md](eval/README.md).
 
 - **SSRF:** hosts are resolved and **all** returned IPs must be public; checked again on every
   redirect hop; only ports 80/443; redirects to other schemes are refused.
-  *Known limit:* DNS rebinding between our check and httpx's own resolution is narrowed by the
-  per-hop re-check but not eliminated. In production this is closed at the network layer
+  *Known limit:* DNS rebinding — httpx resolves the host again after our check, so a DNS server
+  that answers differently the second time is not stopped by the application. In production this is closed at the network layer
   (egress firewall blocking private ranges) or by connecting to the pre-resolved IP.
+- **Rate-limit key:** the client IP comes from the socket, or — only when
+  `TRUST_PROXY_HEADERS=true` behind a proxy such as Render — from the **rightmost**
+  `X-Forwarded-For` entry, which the proxy wrote. The leftmost entry is client-controlled.
 - **Prompt injection:** invisible elements are removed before the LLM sees the text; site text
   is passed inside `<website_content>` tags as data; output is schema-locked, with no tools.
   *Known limit:* text hidden only through external CSS classes can't be detected without
@@ -242,7 +247,7 @@ hidden — see [eval/README.md](eval/README.md).
 ## Tests
 
 ```bash
-pytest            # 154 tests: validators/SSRF, fetcher, extraction, schemas, LLM adapters,
+pytest            # 159 tests: validators/SSRF, fetcher, extraction, schemas, LLM adapters,
                   # pipeline (retry, grounding, cache, budget), endpoint, eval metrics
 pytest -m live    # real provider calls (needs keys)
 ```

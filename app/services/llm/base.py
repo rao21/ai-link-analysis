@@ -74,7 +74,13 @@ def strict_json_schema(model: type[BaseModel]) -> dict[str, Any]:
             return node
         if "$ref" in node:
             return walk(copy.deepcopy(defs[node["$ref"].split("/")[-1]]))
-        out = {k: walk(v) for k, v in node.items() if k not in ("title", "default")}
+        out = {}
+        for key, value in node.items():
+            if key == "properties":
+                # property NAMES are data, not keywords: a field may be called "title"
+                out[key] = {name: walk(sub) for name, sub in value.items()}
+            elif key not in ("title", "default"):
+                out[key] = walk(value)
         if "const" in out:
             out["enum"] = [out.pop("const")]
         if out.get("type") == "object" and "properties" in out:

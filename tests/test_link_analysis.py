@@ -177,3 +177,35 @@ def test_openapi_documents_error_responses(client):
     responses = spec["paths"]["/link-analysis"]["post"]["responses"]
     for status in ["200", "400", "422", "429", "502", "503", "504"]:
         assert status in responses
+
+
+def _req(headers: dict, client_host: str = "203.0.113.9"):
+    from starlette.requests import Request
+
+    scope = {"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+             "client": (client_host, 1234), "method": "GET", "path": "/"}
+    return Request(scope)
+
+
+def test_rate_limit_key_ignores_spoofed_forwarded_for_by_default(monkeypatch):
+    from app.main import client_ip
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "false")
+    try:
+        assert client_ip(_req({"X-Forwarded-For": "1.2.3.4"})) == "203.0.113.9"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_rate_limit_key_behind_proxy_uses_rightmost_forwarded_for(monkeypatch):
+    from app.main import client_ip
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+    try:
+        # client spoofs "1.2.3.4"; the platform proxy appends the real address last
+        assert client_ip(_req({"X-Forwarded-For": "1.2.3.4, 198.51.100.7"}, client_host="10.0.0.2")) == "198.51.100.7"
+        assert client_ip(_req({}, client_host="10.0.0.2")) == "10.0.0.2"
+    finally:
+        get_settings.cache_clear()

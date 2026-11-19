@@ -170,3 +170,24 @@ def test_openai_mapping():
         to_result(refused, 7)
     cut = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"c"', refusal=None), finish_reason="length")], usage=usage)
     assert to_result(cut, 7).truncated is True
+
+
+def _model_field_names(schema: dict) -> set[str]:
+    names = set(schema.get("properties", {}))
+    for sub in schema.get("$defs", {}).values():
+        names |= set(sub.get("properties", {}))
+    return names
+
+
+def _strict_property_names(node) -> set[str]:
+    names = set()
+    for n in _walk(node):
+        if isinstance(n.get("properties"), dict):
+            names |= set(n["properties"])
+    return names
+
+
+def test_strict_schema_keeps_every_model_field():
+    # Regression: a field literally named "title" (ContentIdea.title) was stripped
+    # together with Pydantic's schema titles, so strict decoding could never emit it.
+    assert _strict_property_names(strict_json_schema(LLMAnalysis)) == _model_field_names(LLMAnalysis.model_json_schema())

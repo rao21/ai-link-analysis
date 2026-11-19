@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Cost and abuse protection
     cache_ttl_s: int = 21_600
     rate_limit: str = "10/minute"
+    # True only when running behind a proxy that APPENDS the client IP to X-Forwarded-For
+    # (Render, Heroku, most load balancers). Otherwise the header is client-controlled.
+    trust_proxy_headers: bool = False
     daily_budget_usd: float = 2.0
 
 
