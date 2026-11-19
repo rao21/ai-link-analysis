@@ -68,3 +68,109 @@ def test_unknown_path_uses_error_shape(client):
         "success": False,
         "error": {"code": "NOT_FOUND", "message": "Not Found"},
     }
+
+
+# ---------------------------------------------------------------- POST /link-analysis
+
+import pytest
+
+from app.config import Settings, get_settings
+from app.main import get_analysis_service
+from app.services.analysis_service import AnalysisService
+from app.services.website_extractor import build_http_client
+from tests.conftest import FIXTURES, FakeLLMClient
+
+HTML = {"content-type": "text/html; charset=utf-8"}
+
+
+@pytest.fixture
+def client_with_fake(respx_mock, fake_resolver):
+    respx_mock.get("https://acme.test/").respond(200, headers=HTML, text=(FIXTURES / "sample_site.html").read_text())
+    respx_mock.get("https://acme.test/services").respond(200, headers=HTML, text=(FIXTURES / "services_page.html").read_text())
+    respx_mock.get("https://acme.test/about").respond(404, headers=HTML, text="nope")
+    settings = Settings(_env_file=None)
+    service = AnalysisService(settings, FakeLLMClient(), build_http_client(settings))
+    app.dependency_overrides[get_analysis_service] = lambda: service
+    app.state.limiter.reset()
+    with TestClient(app, raise_server_exceptions=False) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+def test_link_analysis_ok(client_with_fake):
+    response = client_with_fake.post("/link-analysis", json={"url": "https://acme.test"})
+    body = response.json()
+    assert response.status_code == 200 and body["success"] is True
+    assert body["website"] == "https://acme.test/"
+    assert set(body["analysis"]) == {
+        "competitor_analysis", "target_search_queries", "seo_improvements", "top_services", "target_audience"}
+    assert body["meta"]["llm_attempts"] == 1
+
+
+def test_invalid_url_works_without_api_key(client):
+    app.state.service = None
+    response = client.post("/link-analysis", json={"url": "http://localhost/"})
+    app.state.service = None
+    assert response.json()["error"]["code"] == "BLOCKED_ADDRESS"  # no LLM key needed for cheap checks
+
+
+def test_missing_url_field(client):
+    response = client.post("/link-analysis", json={})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+
+
+def test_invalid_url(client_with_fake):
+    response = client_with_fake.post("/link-analysis", json={"url": "ftp://x"})
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_URL"
+
+
+def test_private_url(client_with_fake):
+    response = client_with_fake.post("/link-analysis", json={"url": "http://127.0.0.1/"})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BLOCKED_ADDRESS"
+
+
+def test_rate_limited(client_with_fake, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("RATE_LIMIT", "2/minute")
+    try:
+        codes = [client_with_fake.post("/link-analysis", json={"url": "ftp://x"}).status_code for _ in range(3)]
+        last = client_with_fake.post("/link-analysis", json={"url": "ftp://x"})
+    finally:
+        get_settings.cache_clear()
+    assert codes[:2] == [422, 422] and codes[2] == 429
+    assert last.json()["error"]["code"] == "RATE_LIMITED"
+
+
+def test_no_api_key_gives_clear_error(monkeypatch, fake_resolver, respx_mock):
+    respx_mock.get("https://acme.test/").respond(200, headers=HTML, text=(FIXTURES / "sample_site.html").read_text())
+    respx_mock.get(url__regex=r"https://acme\.test/.+").respond(404, headers=HTML, text="nope")
+    app.state.service = None
+    get_settings.cache_clear()
+    for var in ["GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"]:
+        monkeypatch.setenv(var, "")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    app.state.limiter.reset()
+    try:
+        with TestClient(app, raise_server_exceptions=False) as c:
+            assert c.get("/docs").status_code == 200  # app boots without a key
+            response = c.post("/link-analysis", json={"url": "https://acme.test"})
+    finally:
+        get_settings.cache_clear()
+        app.state.service = None
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "LLM_UNAVAILABLE"
+
+
+def test_root_redirects_to_docs(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code in (302, 307) and response.headers["location"] == "/docs"
+
+
+def test_openapi_documents_error_responses(client):
+    spec = client.get("/openapi.json").json()
+    responses = spec["paths"]["/link-analysis"]["post"]["responses"]
+    for status in ["200", "400", "422", "429", "502", "503", "504"]:
+        assert status in responses

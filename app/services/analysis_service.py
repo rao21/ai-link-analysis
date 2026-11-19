@@ -96,10 +96,13 @@ def _validation_problems(exc: ValidationError) -> list[str]:
 
 
 class AnalysisService:
-    def __init__(self, settings: Settings, llm: LLMClient, http: httpx.AsyncClient,
+    def __init__(self, settings: Settings, llm: LLMClient | Callable[[], LLMClient], http: httpx.AsyncClient,
                  budget: BudgetGuard | None = None) -> None:
+        """`llm` may be a client or a factory; a factory is called on the first LLM call,
+        so every cheap check (URL, SSRF, fetch, content) works even without an API key."""
         self._settings = settings
-        self._llm = llm
+        self._llm_source = llm
+        self._llm_client: LLMClient | None = llm if hasattr(llm, "generate_json") else None
         self._http = http
         self._budget = budget or BudgetGuard(settings.daily_budget_usd)
         self._cache: TTLCache[str, LinkAnalysisResponse] = TTLCache(maxsize=256, ttl=settings.cache_ttl_s)
@@ -130,6 +133,12 @@ class AnalysisService:
             return response
         finally:
             del self._inflight[url]
+
+    @property
+    def _llm(self) -> LLMClient:
+        if self._llm_client is None:
+            self._llm_client = self._llm_source()
+        return self._llm_client
 
     @staticmethod
     def _as_cached(response: LinkAnalysisResponse, started: float) -> LinkAnalysisResponse:
