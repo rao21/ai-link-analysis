@@ -172,6 +172,12 @@ def test_root_serves_demo_page(client):
     assert "/link-analysis" in response.text and "/docs" in response.text
 
 
+def test_demo_page_links_docs_and_source(client):
+    html = client.get("/").text
+    assert 'href="/docs"' in html
+    assert 'href="https://github.com/raopsych/ai-link-analysis"' in html
+
+
 def test_openapi_documents_error_responses(client):
     spec = client.get("/openapi.json").json()
     responses = spec["paths"]["/link-analysis"]["post"]["responses"]
