@@ -57,6 +57,7 @@ def _mean(values):
 def evaluate() -> None:
     per_model: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
     services_by_run: dict[tuple[str, str], list[list[str]]] = defaultdict(list)
+    missing_gold: set[str] = set()
 
     for row in _rows():
         out = json.loads(Path(row["output_path"]).read_text())
@@ -70,6 +71,7 @@ def evaluate() -> None:
             continue
         gold_path = GOLD / f"{row['site']}.json"
         if not gold_path.exists():
+            missing_gold.add(row["site"])
             continue
         gold = json.loads(gold_path.read_text())
         m["schema_valid"].append(row.get("schema_valid", False))
@@ -82,6 +84,10 @@ def evaluate() -> None:
         m["seo_format"].append(seo_format_ok(seo.get("recommended_title", ""), seo.get("primary_keyword", ""), seo.get("meta_description", "")))
         for c in out.get("competitor_analysis", {}).get("competitors", []):
             m["competitor_domain_resolves"].append(_domain_resolves(c.get("website")))
+
+    if missing_gold:
+        print(f"WARNING: no gold file for {sorted(missing_gold)} - these sites are EXCLUDED from accuracy. "
+              f"Add eval/gold/<site>.json (site = host of the final URL, without www).\n")
 
     for (model, _site), runs in services_by_run.items():
         per_model[model]["stability"].append(stability(runs))
