@@ -1,0 +1,251 @@
+{
+  "brand": {
+    "name": "Acme Digital",
+    "category": "Digital Marketing Agency",
+    "summary": "Lahore-based agency building fast websites and running SEO campaigns for small businesses and startups."
+  },
+  "competitor_analysis": {
+    "brand_overview": "Acme Digital is a Lahore agency offering web design, SEO audits, local SEO and Google Ads for small businesses.",
+    "main_category": "Digital Marketing Agency",
+    "main_products_services": [
+      "Web Design",
+      "SEO Audits",
+      "Local SEO",
+      "Google Ads Management"
+    ],
+    "competitors": [
+      {
+        "name": "Synergy Digital",
+        "website": "synergy.test",
+        "description": "Full-service digital agency in Lahore.",
+        "target_market": "Mid-size businesses",
+        "strengths": [
+          "Large team"
+        ],
+        "weaknesses": [
+          "Higher prices"
+        ],
+        "basis": "ai_suggestion"
+      },
+      {
+        "name": "PixelCraft Studio",
+        "website": "https://pixelcraft.test",
+        "description": "Web design studio.",
+        "target_market": "Startups",
+        "strengths": [
+          "Strong portfolio"
+        ],
+        "weaknesses": [
+          "No SEO service"
+        ],
+        "basis": "ai_suggestion"
+      },
+      {
+        "name": "RankUp PK",
+        "website": null,
+        "description": "SEO-focused consultancy.",
+        "target_market": "E-commerce stores",
+        "strengths": [
+          "SEO depth"
+        ],
+        "weaknesses": [
+          "No web design"
+        ],
+        "basis": "ai_suggestion"
+      },
+      {
+        "name": "BrightWeb Solutions",
+        "website": "https://brightweb.test",
+        "description": "Website and app developer.",
+        "target_market": "Enterprises",
+        "strengths": [
+          "Enterprise clients"
+        ],
+        "weaknesses": [
+          "Slow delivery"
+        ],
+        "basis": "ai_suggestion"
+      }
+    ],
+    "comparison_table": [
+      {
+        "aspect": "Main Service",
+        "your_brand": "Web design + SEO",
+        "competitor_name": "Synergy Digital",
+        "competitor_value": "Full-service marketing"
+      },
+      {
+        "aspect": "Target Market",
+        "your_brand": "Small businesses",
+        "competitor_name": "Synergy Digital",
+        "competitor_value": "Mid-size businesses"
+      }
+    ],
+    "competitive_advantages": [
+      "Four-week website delivery",
+      "Combined web design and SEO"
+    ],
+    "market_opportunities": [
+      "Publish case studies of the 120 clients",
+      "Add e-commerce packages"
+    ]
+  },
+  "target_search_queries": [
+    {
+      "query": "web design company in Lahore",
+      "platforms": [
+        "Google"
+      ],
+      "intent": "Service search",
+      "business_relevance": "Matches core web design service",
+      "target_audience": "Small business owners"
+    },
+    {
+      "query": "website for my small business",
+      "platforms": [
+        "Facebook",
+        "Instagram"
+      ],
+      "intent": "Business discovery",
+      "business_relevance": "Targets SMB owners browsing social",
+      "target_audience": "Shop owners"
+    },
+    {
+      "query": "local SEO services Pakistan",
+      "platforms": [
+        "Google",
+        "LinkedIn"
+      ],
+      "intent": "Service comparison",
+      "business_relevance": "Matches local SEO offering",
+      "target_audience": "Marketing managers"
+    },
+    {
+      "query": "startup website design ideas",
+      "platforms": [
+        "Instagram",
+        "X"
+      ],
+      "intent": "Inspiration",
+      "business_relevance": "Attracts early-stage founders",
+      "target_audience": "Startup founders"
+    },
+    {
+      "query": "Google Ads agency for startups",
+      "platforms": [
+        "LinkedIn",
+        "X"
+      ],
+      "intent": "B2B search",
+      "business_relevance": "Matches ads management",
+      "target_audience": "Startup marketing leads"
+    }
+  ],
+  "seo_improvements": {
+    "primary_keyword": "web design agency Lahore",
+    "secondary_keywords": [
+      "SEO services Lahore",
+      "local SEO Pakistan"
+    ],
+    "long_tail_keywords": [
+      "affordable website design for small business in Lahore"
+    ],
+    "business_keywords": [
+      "website development",
+      "Google Ads management"
+    ],
+    "recommended_title": "Web Design Agency Lahore | SEO & Websites - Acme Digital",
+    "title_rationale": "Leads with the primary keyword and stays under 60 characters.",
+    "meta_description": "Acme Digital builds fast websites and runs SEO and Google Ads campaigns for small businesses in Lahore. 120+ local clients. Get a free quote today.",
+    "supporting_content": [
+      {
+        "type": "service_page",
+        "title": "Local SEO Services in Lahore",
+        "purpose": "Rank for local SEO searches"
+      },
+      {
+        "type": "faq",
+        "title": "How long does a website take?",
+        "purpose": "Answer common buyer questions"
+      }
+    ]
+  },
+  "top_services": [
+    {
+      "name": "Web Design",
+      "description": "Custom responsive websites in four weeks.",
+      "target_industry": "Small business",
+      "target_customer": "Business owners",
+      "main_benefit": "Fast professional online presence",
+      "source": "website_content"
+    },
+    {
+      "name": "SEO Audits",
+      "description": "Technical audits that find ranking blockers.",
+      "target_industry": "All industries",
+      "target_customer": "Marketing managers",
+      "main_benefit": "Higher Google rankings",
+      "source": "website_content"
+    },
+    {
+      "name": "Local SEO",
+      "description": "Optimisation for local searches.",
+      "target_industry": "Local services",
+      "target_customer": "Shop owners",
+      "main_benefit": "More local customers",
+      "source": "website_content"
+    },
+    {
+      "name": "Google Ads Management",
+      "description": "Managed paid search campaigns.",
+      "target_industry": "Startups",
+      "target_customer": "Founders",
+      "main_benefit": "Immediate traffic",
+      "source": "website_content"
+    },
+    {
+      "name": "Website Maintenance",
+      "description": "Ongoing updates and support.",
+      "target_industry": "Small business",
+      "target_customer": "Business owners",
+      "main_benefit": "Site stays secure",
+      "source": "inferred"
+    }
+  ],
+  "target_audience": {
+    "primary_audience": [
+      "Small business owners in Lahore"
+    ],
+    "secondary_audience": [
+      "Startup founders"
+    ],
+    "industries": [
+      "Retail",
+      "Professional services"
+    ],
+    "business_types": [
+      "Small businesses",
+      "Startups"
+    ],
+    "customer_profiles": [
+      "Owner-operated shop with no website"
+    ],
+    "geographic_focus": "Lahore, Pakistan",
+    "customer_needs": [
+      "A professional website"
+    ],
+    "customer_challenges": [
+      "Low online visibility"
+    ],
+    "interests": [
+      "Growing sales online"
+    ],
+    "recommended_segments": [
+      {
+        "segment": "Local retailers",
+        "business_type": "Small business",
+        "requirement": "Website + local SEO"
+      }
+    ]
+  }
+}

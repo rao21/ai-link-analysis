@@ -5,6 +5,13 @@ from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+DEFAULT_MODELS = {
+    "gemini": "gemini-3.1-flash-lite",
+    "anthropic": "claude-haiku-5-5",
+    "openai": "gpt-6-luna",
+}
+
+
 class Settings(BaseSettings):
     """All runtime configuration, read from environment variables / `.env`.
 
@@ -19,8 +26,9 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     anthropic_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
+    llm_effort: Literal["low", "medium", "high"] = "low"
     llm_timeout_s: float = 60
-    max_output_tokens: int = 4000
+    max_output_tokens: int = 8000
 
     # Website fetching
     fetch_timeout_s: float = 10
@@ -34,6 +42,12 @@ class Settings(BaseSettings):
     cache_ttl_s: int = 21_600
     rate_limit: str = "10/minute"
     daily_budget_usd: float = 2.0
+
+
+    @property
+    def resolved_model(self) -> str:
+        """`LLM_MODEL` if set, otherwise the recommended default for the provider."""
+        return self.llm_model or DEFAULT_MODELS[self.llm_provider]
 
 
 @lru_cache
