@@ -9,7 +9,8 @@ from app.utils.validators import ensure_public_url, is_public_ip, normalize_url,
 @pytest.mark.parametrize(
     "raw,expected",
     [
-        ("example.com", "https://example.com"),
+        ("example.com", "https://example.com/"),
+        ("https://example.com/", "https://example.com/"),
         ("  HTTPS://Example.COM/about#team ", "https://example.com/about"),
         ("http://example.com:80/x", "http://example.com:80/x"),
         ("https://example.com/search?q=web+design", "https://example.com/search?q=web+design"),

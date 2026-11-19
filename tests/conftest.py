@@ -31,3 +31,48 @@ def fake_resolver(monkeypatch):
 
     monkeypatch.setattr("app.utils.validators.resolve_host", fake_resolve)
     return FAKE_DNS
+
+
+# ---------------------------------------------------------------- LLM fakes
+
+import copy
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from app.services.llm.base import LLMResult
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def llm_valid() -> dict:
+    return json.loads((FIXTURES / "llm_valid.json").read_text())
+
+
+@dataclass
+class LLMCall:
+    system: str
+    user: str
+
+
+@dataclass
+class FakeLLMClient:
+    """Returns queued outputs in order (dict -> valid result, LLMResult -> as is)."""
+
+    outputs: list = field(default_factory=list)
+    calls: list[LLMCall] = field(default_factory=list)
+    provider: str = "fake"
+    model: str = "fake-model"
+
+    async def generate_json(self, system, user, schema):
+        self.calls.append(LLMCall(system, user))
+        item = self.outputs.pop(0) if self.outputs else llm_valid()
+        if isinstance(item, LLMResult):
+            return item
+        return LLMResult(data=copy.deepcopy(item), input_tokens=5000, cached_input_tokens=1000,
+                         output_tokens=1500, latency_ms=900)
+
+
+@pytest.fixture
+def fake_llm() -> FakeLLMClient:
+    return FakeLLMClient()

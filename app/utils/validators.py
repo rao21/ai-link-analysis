@@ -53,7 +53,8 @@ def normalize_url(raw: str) -> str:
     netloc = f"[{host}]" if ":" in host else host
     if port is not None:
         netloc += f":{port}"
-    return urlunsplit((scheme, netloc, parts.path, parts.query, ""))
+    # "https://a.com" and "https://a.com/" are the same page: one canonical form (also the cache key).
+    return urlunsplit((scheme, netloc, parts.path or "/", parts.query, ""))
 
 
 def _canonical_host(hostname: str | None) -> str:
