@@ -18,7 +18,7 @@ class Tiny(BaseModel):
 async def test_structured_output_roundtrip(provider):
     settings = Settings(llm_provider=provider)
     key = {"gemini": settings.gemini_api_key, "anthropic": settings.anthropic_api_key, "openai": settings.openai_api_key}[provider]
-    if key is None:
+    if key is None or not key.get_secret_value():
         pytest.skip(f"no {provider} key configured")
     client = get_llm_client(settings)
     result = await client.generate_json(

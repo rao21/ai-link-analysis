@@ -130,7 +130,7 @@ curl -X POST http://localhost:4000/link-analysis \
 }
 ```
 
-A full real response is in [docs/sample-response.json](docs/sample-response.json) _(added after the measured run)_.
+A full real response (basecamp.com, Gemini 3.1 Flash-Lite) is in [docs/sample-response.json](docs/sample-response.json).
 
 ### Errors
 
